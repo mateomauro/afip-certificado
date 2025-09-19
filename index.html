@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>AFIP – Generar CSR</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/node-forge@1.3.1/dist/forge.min.js"></script>
+  <style>
+    :root{
+      --bg:#0f172a;          /* slate-900 */
+      --card:#0b1222cc;      /* glass */
+      --stroke:#203055;
+      --muted:#9aa7bf;
+      --text:#e5e7eb;
+      --heading:#ffffff;
+      --primary:#2563eb;     /* indigo-600 */
+      --primary-contrast:#fff;
+      --ok:#10b981;          /* emerald-500 */
+      --warn:#f59e0b;        /* amber-500 */
+      --radius:14px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; color:var(--text);
+      font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Helvetica Neue",Arial,"Noto Sans",sans-serif;
+      background:
+      
+        radial-gradient(1200px 0px at 10% -10%, #1f2a55 0, transparent 60%),
+        radial-gradient(1000px 0px at 90% -10%, #0b3a75 0, transparent 60%),
+        var(--bg);
+      display:flex; align-items:flex-start; justify-content:center;
+    }
+    .wrap{max-width:920px; width:100%; padding:32px 18px 48px}
+    h1{margin:0 0 18px; color:var(--heading); letter-spacing:.3px; font-weight:800}
+    .cards{display:grid; gap:18px}
+    .card{
+      backdrop-filter: blur(8px);
+      background: var(--card);
+      border:1px solid var(--stroke);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.30);
+    }
+    .card h2{margin:0 0 10px; font-size:16px; color:#fff}
+    label{display:block; font-size:12px; color:var(--muted); margin:8px 0 6px}
+    input,textarea{
+      width:100%; color:var(--text); background:#0b1222;
+      border:1px solid var(--stroke); border-radius:12px;
+      padding:12px 12px; outline:none; transition:.2s border-color;
+    }
+    input:focus,textarea:focus{border-color:#3b82f6}
+    textarea{min-height:160px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
+    .grid{display:grid; gap:12px}
+    @media (min-width:720px){ .grid.cols-2{grid-template-columns:1fr 1fr} }
+    .actions{display:flex; gap:10px; flex-wrap:wrap; margin-top:12px}
+    .btn{
+      border:1px solid transparent; border-radius:12px;
+      padding:10px 14px; font-weight:700; cursor:pointer; user-select:none;
+      background:#1f2937; color:#e5e7eb;
+    }
+    .btn.primary{background:var(--primary); color:var(--primary-contrast)}
+    .btn.secondary{background:#111827; color:#e5e7eb}
+    .btn.ghost{background:transparent; border-color:var(--stroke)}
+    .btn:disabled{opacity:.55; cursor:not-allowed}
+    .hint{font-size:12px; color:var(--muted)}
+    .status{font-size:13px; margin-left:8px}
+    .ok{color:var(--ok); font-weight:700}
+    .warn{color:var(--warn)}
+    details{border-top:1px dashed var(--stroke); margin-top:12px; padding-top:10px}
+    summary{cursor:pointer; color:#cbd5e1; font-weight:700; margin:-5px 0 6px}
+    .badge{display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; background:#172554; color:#c7d2fe; margin-left:6px}
+    .spin{display:inline-block; width:16px; height:16px; border-radius:50%;
+      border:3px solid rgba(255,255,255,.15); border-top-color:#fff; animation:spin 1s linear infinite; vertical-align:-3px; margin-right:6px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>AFIP – Generar CSR</h1>
+
+    <section class="cards">
+      <!-- Generación CSR -->
+      <div class="card">
+        <h2>1) Datos para el CSR</h2>
+        <div class="grid cols-2">
+          <div>
+            <label for="cuit">CUIT (11 dígitos)</label>
+            <input id="cuit" inputmode="numeric" autocomplete="off" placeholder="20123456789">
+          </div>
+          <div>
+            <label for="alias">Alias del certificado (CN)</label>
+            <input id="alias" autocomplete="off" placeholder="mi-certificado-wsaa">
+          </div>
+        </div>
+        <div class="actions">
+          <button id="gen" class="btn primary">Generar CSR</button>
+          <span id="genStatus" class="status"></span>
+        </div>
+
+        <label for="csr" style="margin-top:12px">CSR para pegar en AFIP → WSAA → Crear DN y certificado</label>
+        <textarea id="csr" readonly placeholder="Aquí aparecerá tu CSR (PEM)"></textarea>
+        <div class="actions">
+          <button id="copyCsr" class="btn ghost" disabled>Copiar CSR</button>
+          <!-- <button id="dlCsr" class="btn secondary" disabled>Descargar .csr</button> -->
+        </div>
+
+        <!-- <details>
+          <summary>Opciones avanzadas <span class="badge">clave privada</span></summary>
+          <div class="hint">La clave privada <b>no se muestra</b>, solo podrás descargarla. Guardala en un lugar seguro.</div>
+          <div class="actions" style="margin-top:8px">
+            <button id="dlKey" class="btn" disabled>Descargar .key (privada)</button>
+          </div>
+        </details> -->
+      </div>
+
+      <!-- CRT -->
+      <div class="card">
+        <h2>2) Pegar el CRT devuelto por AFIP</h2>
+        <label for="crt">Pegá el certificado (CRT) en formato PEM</label>
+        <textarea id="crt" placeholder="Aqui pega el CRT"></textarea>
+        <div class="actions">
+          <!-- <button id="normalize" class="btn ghost">Normalizar</button> -->
+          <button id="dlCrt" class="btn secondary">Descargar .crt</button>
+        </div>
+        <!-- <div class="hint">“Normalizar” agrega los encabezados y saltos de línea si AFIP te lo devolvió en una sola línea.</div> -->
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // Helpers
+    const $ = s => document.querySelector(s);
+    const onlyDigits = s => (s||'').replace(/\D+/g,'');
+    const sanitizeName = s => (s || 'certificado').replace(/[^a-zA-Z0-9._-]+/g,'-').slice(0,64) || 'certificado';
+    function download(text, filename){
+      const blob = new Blob([text], {type:'application/x-pem-file'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click();
+      setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0);
+    }
+    function normalizePemCert(input){
+      if(!input) return '';
+      const trimmed = input.trim();
+      if (trimmed.includes('BEGIN CERTIFICATE')) return trimmed + (trimmed.endsWith('\n') ? '' : '\n');
+      const base64 = trimmed.replace(/-----.*?-----/g,'').replace(/\s+/g,'');
+      const lines = base64.match(/.{1,64}/g) || [];
+      return '-----BEGIN CERTIFICATE-----\n' + lines.join('\n') + '\n-----END CERTIFICATE-----\n';
+    }
+
+    // Elements
+    const elCuit = $('#cuit'), elAlias = $('#alias'), elCSR = $('#csr'), elCRT = $('#crt');
+    const btnGen = $('#gen'), status = $('#genStatus');
+    const btnCopyCsr = $('#copyCsr'), btnDlCsr = $('#dlCsr'), btnDlKey = $('#dlKey');
+    const btnNormalize = $('#normalize'), btnDlCrt = $('#dlCrt');
+
+    let lastPemKey = '', lastPemCsr = '';
+
+    btnGen.addEventListener('click', () => {
+      const cuit = onlyDigits(elCuit.value);
+      const alias = (elAlias.value || '').trim();
+
+      if (cuit.length !== 11){ alert('CUIT debe tener 11 dígitos.'); elCuit.focus(); return; }
+      if (!alias){ alert('Ingresá un Alias (CN).'); elAlias.focus(); return; }
+
+      btnGen.disabled = true; status.innerHTML = `<span class="spin"></span>Generando claves y CSR...`;
+
+      setTimeout(() => {
+        try{
+          const keys = forge.pki.rsa.generateKeyPair({ bits:2048, e:0x10001 });
+          const csr = forge.pki.createCertificationRequest();
+          csr.publicKey = keys.publicKey;
+          csr.setSubject([
+            { name:'commonName',  value: alias },
+            { name:'countryName', value: 'AR' },
+            { name:'serialNumber', value: 'CUIT ' + cuit }
+          ]);
+          csr.sign(keys.privateKey, forge.md.sha256.create());
+
+          lastPemCsr = forge.pki.certificationRequestToPem(csr);
+          lastPemKey = forge.pki.privateKeyToPem(keys.privateKey);
+
+          elCSR.value = lastPemCsr;
+          const base = sanitizeName(alias || ('cuit-' + cuit));
+
+          btnCopyCsr.disabled = false;
+          btnCopyCsr.onclick = async () => {
+            try{ await navigator.clipboard.writeText(lastPemCsr); status.innerHTML = `<span class="ok">CSR copiado ✔</span>`; }
+            catch{ alert('No se pudo copiar.'); }
+          };
+
+          btnDlCsr.disabled = false;
+          btnDlCsr.onclick = () => download(lastPemCsr, base + '.csr');
+
+          btnDlKey.disabled = false;
+          btnDlKey.onclick = () => download(lastPemKey, base + '.key');
+
+          status.innerHTML = `<span class="ok">¡Listo! Usá el CSR en AFIP y descargá tu .key desde “Avanzado”.</span>`;
+        }catch(e){
+          console.error(e);
+          status.innerHTML = `<span class="warn">Error generando el CSR.</span>`;
+          alert('Error: ' + e.message);
+        }finally{
+          btnGen.disabled = false;
+        }
+      }, 10);
+    });
+
+    btnNormalize.addEventListener('click', () => { elCRT.value = normalizePemCert(elCRT.value); });
+    btnDlCrt.addEventListener('click', () => {
+      const alias = sanitizeName(elAlias.value || 'certificado');
+      const pem = normalizePemCert(elCRT.value);
+      if(!pem){ alert('Pegá el CRT primero.'); return; }
+      download(pem, alias + '.crt');
+    });
+  </script>
+</body>
+</html>
