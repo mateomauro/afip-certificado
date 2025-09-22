@@ -94,36 +94,25 @@
         <label for="csr" style="margin-top:12px">CSR para pegar en AFIP → WSAA → Crear DN y certificado</label>
         <textarea id="csr" readonly placeholder="Aquí aparecerá tu CSR (PEM)"></textarea>
         <div class="actions">
-          <button id="copyCsr" class="btn ghost" disabled>Copiar CSR</button>
-          <!-- <button id="dlCsr" class="btn secondary" disabled>Descargar .csr</button> -->
+          <!-- cambiado: ahora se descarga en vez de copiar -->
+          <button id="dlCsr" class="btn secondary" disabled>Descargar .csr</button>
         </div>
-
-        <!--
-        <details>
-          <summary>Opciones avanzadas</summary>
-          <div class="hint">La clave privada no se muestra, solo se descarga.</div>
-          <div class="actions" style="margin-top:8px">
-            <button id="dlKey" class="btn" disabled>Descargar .key (privada)</button>
-          </div>
-        </details>
-        -->
       </div>
 
-      <!-- CRT -->
+      <!-- PARTE 2 COMENTADA
       <div class="card">
         <h2>2) Pegar el CRT devuelto por AFIP</h2>
         <label for="crt">Pegá el certificado (CRT) en formato PEM</label>
         <textarea id="crt" placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"></textarea>
         <div class="actions">
-          <!-- <button id="normalize" class="btn ghost">Normalizar</button> -->
           <button id="dlCrt" class="btn secondary">Descargar .crt</button>
         </div>
       </div>
+      -->
     </section>
   </main>
 
   <script>
-    // Helpers
     const $ = s => document.querySelector(s);
     const onlyDigits = s => (s||'').replace(/\D+/g,'');
     const sanitizeName = s => (s || 'certificado').replace(/[^a-zA-Z0-9._-]+/g,'-').slice(0,64) || 'certificado';
@@ -136,23 +125,9 @@
       setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0);
     }
 
-    function normalizePemCert(input){
-      if(!input) return '';
-      const trimmed = input.trim();
-      if (trimmed.includes('BEGIN CERTIFICATE')) return trimmed + (trimmed.endsWith('\n') ? '' : '\n');
-      const base64 = trimmed.replace(/-----.*?-----/g,'').replace(/\s+/g,'');
-      const lines = base64.match(/.{1,64}/g) || [];
-      return '-----BEGIN CERTIFICATE-----\n' + lines.join('\n') + '\n-----END CERTIFICATE-----\n';
-    }
-
-    // Elements
-    const elCuit = $('#cuit'), elAlias = $('#alias'), elCSR = $('#csr'), elCRT = $('#crt');
+    const elCuit = $('#cuit'), elAlias = $('#alias'), elCSR = $('#csr');
     const btnGen = $('#gen'), status = $('#genStatus');
-    const btnCopyCsr = $('#copyCsr');
-    const btnDlCsr = $('#dlCsr');         // puede no existir
-    const btnDlKey = $('#dlKey');         // puede no existir
-    const btnNormalize = $('#normalize'); // puede no existir
-    const btnDlCrt = $('#dlCrt');
+    const btnDlCsr = $('#dlCsr');
 
     let lastPemKey = '', lastPemCsr = '';
 
@@ -184,28 +159,10 @@
           elCSR.value = lastPemCsr;
           const base = sanitizeName(alias || ('cuit-' + cuit));
 
-          // Copiar CSR (si el botón existe)
-          if (btnCopyCsr){
-            btnCopyCsr.disabled = false;
-            btnCopyCsr.onclick = async () => {
-              try{ await navigator.clipboard.writeText(lastPemCsr); status.innerHTML = `<span class="ok">CSR copiado ✔</span>`; }
-              catch{ alert('No se pudo copiar.'); }
-            };
-          }
+          btnDlCsr.disabled = false;
+          btnDlCsr.onclick = () => download(lastPemCsr, base + '.csr');
 
-          // Descargar CSR (solo si existe el botón)
-          if (btnDlCsr){
-            btnDlCsr.disabled = false;
-            btnDlCsr.onclick = () => download(lastPemCsr, base + '.csr');
-          }
-
-          // Descargar KEY (solo si existe el botón)
-          if (btnDlKey){
-            btnDlKey.disabled = false;
-            btnDlKey.onclick = () => download(lastPemKey, base + '.key');
-          }
-
-          status.innerHTML = `<span class="ok">¡Listo! Usá el CSR en AFIP.</span>`;
+          status.innerHTML = `<span class="ok">¡Listo! CSR generado ✔</span>`;
         }catch(e){
           console.error(e);
           status.innerHTML = `<span class="warn">Error generando el CSR.</span>`;
@@ -214,19 +171,6 @@
           btnGen.disabled = false;
         }
       }, 10);
-    });
-
-    // Normalizar CRT (solo si existe el botón)
-    if (btnNormalize){
-      btnNormalize.addEventListener('click', () => { elCRT.value = normalizePemCert(elCRT.value); });
-    }
-
-    // Descargar CRT (siempre)
-    btnDlCrt.addEventListener('click', () => {
-      const alias = sanitizeName(elAlias.value || 'certificado');
-      const pem = normalizePemCert(elCRT.value);
-      if(!pem){ alert('Pegá el CRT primero.'); return; }
-      download(pem, alias + '.crt');
     });
   </script>
 </body>
