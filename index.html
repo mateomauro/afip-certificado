@@ -60,9 +60,7 @@
     }
     .btn.primary{background:var(--primary); color:var(--primary-contrast)}
     .btn.secondary{background:#111827; color:#e5e7eb}
-    .btn.ghost{background:transparent; border-color:var(--stroke)}
     .btn:disabled{opacity:.55; cursor:not-allowed}
-    .hint{font-size:12px; color:var(--muted)}
     .status{font-size:13px; margin-left:8px}
     .ok{color:var(--ok); font-weight:700}
     .warn{color:var(--warn)}
@@ -73,9 +71,8 @@
     <h1>AFIP – Generar CSR</h1>
 
     <section class="cards">
-      <!-- Generación CSR -->
       <div class="card">
-        <h2>1) Datos para el CSR</h2>
+        <h2>1) Datos para generar el CSR y la KEY</h2>
         <div class="grid cols-2">
           <div>
             <label for="cuit">CUIT (11 dígitos)</label>
@@ -94,21 +91,9 @@
         <label for="csr" style="margin-top:12px">CSR para pegar en AFIP → WSAA → Crear DN y certificado</label>
         <textarea id="csr" readonly placeholder="Aquí aparecerá tu CSR (PEM)"></textarea>
         <div class="actions">
-          <!-- cambiado: ahora se descarga en vez de copiar -->
-          <button id="dlCsr" class="btn secondary" disabled>Descargar .csr</button>
+          <button id="dlBoth" class="btn secondary" disabled>Descargar CSR y KEY</button>
         </div>
       </div>
-
-      <!-- PARTE 2 COMENTADA
-      <div class="card">
-        <h2>2) Pegar el CRT devuelto por AFIP</h2>
-        <label for="crt">Pegá el certificado (CRT) en formato PEM</label>
-        <textarea id="crt" placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"></textarea>
-        <div class="actions">
-          <button id="dlCrt" class="btn secondary">Descargar .crt</button>
-        </div>
-      </div>
-      -->
     </section>
   </main>
 
@@ -117,17 +102,9 @@
     const onlyDigits = s => (s||'').replace(/\D+/g,'');
     const sanitizeName = s => (s || 'certificado').replace(/[^a-zA-Z0-9._-]+/g,'-').slice(0,64) || 'certificado';
 
-    function download(text, filename){
-      const blob = new Blob([text], {type:'application/x-pem-file'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = filename;
-      document.body.appendChild(a); a.click();
-      setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0);
-    }
-
     const elCuit = $('#cuit'), elAlias = $('#alias'), elCSR = $('#csr');
     const btnGen = $('#gen'), status = $('#genStatus');
-    const btnDlCsr = $('#dlCsr');
+    const btnDlBoth = $('#dlBoth');
 
     let lastPemKey = '', lastPemCsr = '';
 
@@ -159,8 +136,28 @@
           elCSR.value = lastPemCsr;
           const base = sanitizeName(alias || ('cuit-' + cuit));
 
-          btnDlCsr.disabled = false;
-          btnDlCsr.onclick = () => download(lastPemCsr, base + '.csr');
+          btnDlBoth.disabled = false;
+          btnDlBoth.onclick = () => {
+            // Descargar CSR
+            const blobCsr = new Blob([lastPemCsr], {type:'application/x-pem-file'});
+            const urlCsr = URL.createObjectURL(blobCsr);
+            const aCsr = document.createElement('a');
+            aCsr.href = urlCsr;
+            aCsr.download = base + '.csr';
+            document.body.appendChild(aCsr);
+            aCsr.click();
+            setTimeout(()=>{ URL.revokeObjectURL(urlCsr); aCsr.remove(); }, 0);
+
+            // Descargar KEY
+            const blobKey = new Blob([lastPemKey], {type:'application/x-pem-file'});
+            const urlKey = URL.createObjectURL(blobKey);
+            const aKey = document.createElement('a');
+            aKey.href = urlKey;
+            aKey.download = base + '.key';
+            document.body.appendChild(aKey);
+            aKey.click();
+            setTimeout(()=>{ URL.revokeObjectURL(urlKey); aKey.remove(); }, 500);
+          };
 
           status.innerHTML = `<span class="ok">¡Listo! CSR generado ✔</span>`;
         }catch(e){
