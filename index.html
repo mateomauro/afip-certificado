@@ -91,7 +91,8 @@
         <label for="csr" style="margin-top:12px">CSR para pegar en AFIP → WSAA → Crear DN y certificado</label>
         <textarea id="csr" readonly placeholder="Aquí aparecerá tu CSR (PEM)"></textarea>
         <div class="actions">
-          <button id="dlBoth" class="btn secondary" disabled>Descargar CSR y KEY</button>
+          <button id="dlCsr" class="btn secondary" disabled>Descargar CSR</button>
+          <button id="dlKey" class="btn secondary" disabled>Descargar KEY</button>
         </div>
       </div>
     </section>
@@ -104,9 +105,9 @@
 
     const elCuit = $('#cuit'), elAlias = $('#alias'), elCSR = $('#csr');
     const btnGen = $('#gen'), status = $('#genStatus');
-    const btnDlBoth = $('#dlBoth');
+    const btnDlCsr = $('#dlCsr'), btnDlKey = $('#dlKey');
 
-    let lastPemKey = '', lastPemCsr = '';
+    let lastPemKey = '', lastPemCsr = '', base = '';
 
     btnGen.addEventListener('click', () => {
       const cuit = onlyDigits(elCuit.value);
@@ -132,13 +133,15 @@
 
           lastPemCsr = forge.pki.certificationRequestToPem(csr);
           lastPemKey = forge.pki.privateKeyToPem(keys.privateKey);
+          base = sanitizeName(alias || ('cuit-' + cuit));
 
           elCSR.value = lastPemCsr;
-          const base = sanitizeName(alias || ('cuit-' + cuit));
 
-          btnDlBoth.disabled = false;
-          btnDlBoth.onclick = () => {
-            // Descargar CSR
+          btnDlCsr.disabled = false;
+          btnDlKey.disabled = false;
+
+          // Descargar CSR
+          btnDlCsr.onclick = () => {
             const blobCsr = new Blob([lastPemCsr], {type:'application/x-pem-file'});
             const urlCsr = URL.createObjectURL(blobCsr);
             const aCsr = document.createElement('a');
@@ -147,8 +150,10 @@
             document.body.appendChild(aCsr);
             aCsr.click();
             setTimeout(()=>{ URL.revokeObjectURL(urlCsr); aCsr.remove(); }, 0);
+          };
 
-            // Descargar KEY
+          // Descargar KEY
+          btnDlKey.onclick = () => {
             const blobKey = new Blob([lastPemKey], {type:'application/x-pem-file'});
             const urlKey = URL.createObjectURL(blobKey);
             const aKey = document.createElement('a');
@@ -156,7 +161,7 @@
             aKey.download = base + '.key';
             document.body.appendChild(aKey);
             aKey.click();
-            setTimeout(()=>{ URL.revokeObjectURL(urlKey); aKey.remove(); }, 500);
+            setTimeout(()=>{ URL.revokeObjectURL(urlKey); aKey.remove(); }, 0);
           };
 
           status.innerHTML = `<span class="ok">¡Listo! CSR generado ✔</span>`;
